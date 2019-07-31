@@ -5,6 +5,7 @@ import android.content.ContentResolver;
 import android.content.Intent;
 import android.database.Cursor;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.provider.OpenableColumns;
 import android.util.Log;
@@ -34,6 +35,7 @@ import java.util.ArrayList;
 public class DocumentPicker extends ReactContextBaseJavaModule implements ActivityEventListener {
     private static final String NAME = "RNDocumentPicker";
     private static final int READ_REQUEST_CODE = 41;
+    private static final int FOLDER_REQUEST_CODE = 42;
 
     private static class Fields {
         private static final String FILE_SIZE = "fileSize";
@@ -79,6 +81,20 @@ public class DocumentPicker extends ReactContextBaseJavaModule implements Activi
         getReactApplicationContext().startActivityForResult(intent, READ_REQUEST_CODE, Bundle.EMPTY);
     }
 
+    @ReactMethod
+    public void pickDirectory(Callback callback) {
+        Intent intent;
+        if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
+        } else {
+            intent = new Intent(Intent.ACTION_PICK);
+        }
+
+        this.callback = callback;
+
+        getReactApplicationContext().startActivityForResult(intent, FOLDER_REQUEST_CODE, Bundle.EMPTY);
+    }
+
     // removed @Override temporarily just to get it working on RN0.33 and RN0.32 - will remove
     public void onActivityResult(Activity activity, int requestCode, int resultCode, Intent data) {
         onActivityResult(requestCode, resultCode, data);
@@ -86,7 +102,7 @@ public class DocumentPicker extends ReactContextBaseJavaModule implements Activi
 
     // removed @Override temporarily just to get it working on RN0.33 and RN0.32
     public void onActivityResult(int requestCode, int resultCode, Intent data) {
-        if (requestCode != READ_REQUEST_CODE)
+        if (requestCode != READ_REQUEST_CODE && requestCode != FOLDER_REQUEST_CODE)
             return;
 
         if (resultCode != Activity.RESULT_OK) {
@@ -99,9 +115,14 @@ public class DocumentPicker extends ReactContextBaseJavaModule implements Activi
             return;
         }
 
+
         try {
             Uri uri = data.getData();
-            callback.invoke(null, toMapWithMetadata(uri));
+            if (requestCode == READ_REQUEST_CODE){
+                callback.invoke(null, toMapWithMetadata(uri));
+            } else if (requestCode == FOLDER_REQUEST_CODE) {
+                callback.invoke(null, uri.toString());
+            }
         } catch (Exception e) {
             Log.e(NAME, "Failed to read", e);
             callback.invoke(e.getMessage(), null);
